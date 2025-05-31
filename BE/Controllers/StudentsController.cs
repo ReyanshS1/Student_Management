@@ -15,12 +15,54 @@ namespace StudentAPI.Controllers
             {
                 _context = context;
             }
-            [HttpGet]
-            public async Task<IActionResult> GetStudents()
+        [HttpGet]
+        public async Task<IActionResult> GetStudents(
+            string search = "", int? age = null,
+            int page = 1, int pageSize = 5,
+            string sortBy = "Name", bool isAsc = true)
+        {
+            var query = _context.Students.AsQueryable();
+
+            // Filtering
+            if (!string.IsNullOrEmpty(search))
+                query = query.Where(s => s.Name.Contains(search));
+
+            if (age.HasValue)
+                query = query.Where(s => s.Age == age);
+
+            // Sorting
+            switch (sortBy.ToLower())
             {
-                return Ok(await _context.Students.ToListAsync());
+                case "age":
+                    query = isAsc ? query.OrderBy(s => s.Age) : query.OrderByDescending(s => s.Age);
+                    break;
+
+                case "class":
+                    query = isAsc ? query.OrderBy(s => s.Class) : query.OrderByDescending(s => s.Class);
+                    break;
+
+                default: // sort by Name
+                    query = isAsc ? query.OrderBy(s => s.Name) : query.OrderByDescending(s => s.Name);
+                    break;
             }
-            [HttpPost]
+
+            // Pagination
+            var totalCount = await query.CountAsync();
+            var students = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return Ok(new
+            {
+                TotalCount = totalCount,
+                Page = page,
+                PageSize = pageSize,
+                Data = students
+            });
+        }
+
+        [HttpPost]
             public async Task<IActionResult> AddStudent(Student student)
             {
                 _context.Students.Add(student);
